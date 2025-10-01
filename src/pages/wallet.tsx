@@ -1,4 +1,3 @@
-// src/pages/wallet.tsx
 import Layout from "../components/Layout";
 import { useEffect, useState } from "react";
 import { getWallet } from "../lib/api";
@@ -16,40 +15,59 @@ export default function Wallet() {
 
     return (
         <Layout>
-            <h1 className="text-2xl font-bold mb-4">Wallet Dashboard</h1>
+            <h1 className="text-3xl font-extrabold mb-6 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+                Wallet Dashboard
+            </h1>
+
             {wallet ? (
                 <div className="space-y-6">
-                    <div className="p-4 border rounded shadow bg-white">
+                    {/* Wallet details card */}
+                    <div className="uv-card uv-glow-soft">
                         <p>
-                            <strong>ID:</strong> {wallet.walletId}
+                            <span className="text-gray-400">ID:</span>{" "}
+                            {wallet.walletId}
                         </p>
                         <p>
-                            <strong>Address:</strong> {wallet.address}
+                            <span className="text-gray-400">Address:</span>{" "}
+                            {wallet.address}
                         </p>
                         <p>
-                            <strong>Balance:</strong> {wallet.balance}
+                            <span className="text-gray-400">Balance:</span>{" "}
+                            {wallet.balance}
                         </p>
                     </div>
-                    <div>
+
+                    {/* Transactions card */}
+                    <div className="uv-card uv-glow">
                         <h2 className="text-xl font-semibold mb-2">
                             Transactions
                         </h2>
-                        <ul className="divide-y">
+                        <ul className="divide-y divide-gray-700">
                             {wallet.transactions.map((txn: any) => (
                                 <li
                                     key={txn.id}
-                                    className="py-2 flex justify-between"
+                                    className="py-2 flex justify-between text-sm"
                                 >
-                                    <span>{txn.date}</span>
+                                    <span className="text-gray-400">
+                                        {txn.date}
+                                    </span>
                                     <span>{txn.type}</span>
-                                    <span>{txn.amount}</span>
+                                    <span
+                                        className={
+                                            txn.type === "credit"
+                                                ? "text-green-400"
+                                                : "text-red-400"
+                                        }
+                                    >
+                                        {txn.amount}
+                                    </span>
                                 </li>
                             ))}
                         </ul>
                     </div>
                 </div>
             ) : (
-                <p>Loading mock wallet...</p>
+                <p className="text-gray-400">Loading mock wallet...</p>
             )}
         </Layout>
     );
