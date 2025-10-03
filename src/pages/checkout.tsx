@@ -1,64 +1,120 @@
 // src/pages/checkout.tsx
 import Layout from "../components/Layout";
 import { useState } from "react";
-import { getWallet } from "../lib/api";
+import useSWR from "swr";
+import { mutate } from "swr";
+import type { GetServerSideProps } from "next";
+import { getSession } from "../../src/lib/session";
 
-export default function Checkout() {
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
+const { data: user, error } = useSWR("/api/me", fetcher, {
+    refreshInterval: 5000, // every 5s
+});
+
+function Checkout() {
     const [status, setStatus] = useState<string | null>(null);
+    const [updatedWallet, setUpdatedWallet] = useState<any>(null);
+    const { data: user, error } = useSWR("/api/me", fetcher);
 
-    // Mock cart: 1 item costing 75 USDT
     const cartTotal = 75.0;
 
     async function handleCheckout() {
-        // Grab mock wallet (replace with API later)
-        const wallet = await getWallet("demo-wallet-id");
-        const balance = parseFloat(wallet.balance);
-
-        if (balance >= cartTotal) {
-            setStatus("success");
-        } else {
-            setStatus("insufficient");
+        if (!user || !user.wallets?.length) {
+            setStatus("no-wallet");
+            return;
         }
+
+        const walletId = user.wallets[0].id;
+
+        try {
+            const res = await fetch("/api/checkout", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ walletId, amount: cartTotal }),
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                setUpdatedWallet(data.wallet);
+                setStatus("success");
+                // 🔄 Revalidate the /api/me cache so profile + other components update
+                mutate("/api/me");
+            } else if (data.error === "Insufficient funds") {
+                setStatus("insufficient");
+            } else {
+                setStatus("error");
+            }
+        } catch (err) {
+            console.error(err);
+            setStatus("error");
+        }
+    }
+
+    if (error) {
+        return (
+            <Layout>
+                <p className="text-red-500">
+                    Error loading user: {error.message}
+                </p>
+            </Layout>
+        );
+    }
+
+    if (!user) {
+        return (
+            <Layout>
+                <p className="text-gray-500">Loading...</p>
+            </Layout>
+        );
     }
 
     return (
         <Layout>
             <h1 className="text-2xl font-bold mb-4">USDT Store Checkout</h1>
+            <p>
+                Charging <strong>${cartTotal}</strong> to wallet:{" "}
+                {user.wallets[0]?.name || "—"}
+            </p>
+            <button
+                onClick={handleCheckout}
+                className="uv-card uv-glow p-3 rounded mt-4"
+            >
+                Confirm Purchase
+            </button>
 
-            <div className="uv-card uv-glow-soft max-w-md space-y-4">
-                {/* Cart */}
-                <div>
-                    <h2 className="font-semibold text-lg">Cart</h2>
-                    <ul className="list-disc pl-6 text-gray-800 dark:text-gray-200">
-                        <li>Demo Item (75.00 USDT)</li>
-                    </ul>
-                    <p className="mt-2 font-bold text-gray-900 dark:text-gray-100">
-                        Total: {cartTotal.toFixed(2)} USDT
+            {status === "success" && (
+                <div className="mt-4 text-green-500">
+                    <p>✅ Success! Purchase complete.</p>
+                    <p>
+                        New balance:{" "}
+                        <strong>
+                            {updatedWallet?.balance?.toFixed(2) || "—"}
+                        </strong>
                     </p>
                 </div>
-
-                {/* Button */}
-                <button
-                    onClick={handleCheckout}
-                    className="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700"
-                >
-                    Confirm Purchase
-                </button>
-
-                {/* Status messages */}
-                {status === "success" && (
-                    <div className="mt-4 p-4 rounded bg-green-100 dark:bg-green-800 text-green-900 dark:text-green-100">
-                        ✅ Purchase successful! 75.00 USDT deducted from your
-                        wallet.
-                    </div>
-                )}
-                {status === "insufficient" && (
-                    <div className="mt-4 p-4 rounded bg-red-100 dark:bg-red-800 text-red-900 dark:text-red-100">
-                        ❌ Insufficient balance. Please add funds to your
-                        wallet.
-                    </div>
-                )}
-            </div>
+            )}
+            {status === "insufficient" && (
+                <p className="mt-4 text-red-500">❌ Insufficient funds.</p>
+            )}
+            {status === "no-wallet" && (
+                <p className="mt-4 text-yellow-500">⚠️ No wallet available.</p>
+            )}
+            {status === "error" && (
+                <p className="mt-4 text-red-500">⚠️ Something went wrong.</p>
+            )}
         </Layout>
     );
 }
+
+// SSR protection with Neon session
+export const getServerSideProps: GetServerSideProps = async ({ req }) => {
+    const session = await getSession(req as any);
+    if (!session) {
+        return { redirect: { destination: "/", permanent: false } };
+    }
+    return { props: {} };
+};
+
+export default Checkout;

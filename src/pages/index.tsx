@@ -1,40 +1,23 @@
-import { useState, useEffect } from "react";
-import { useRouter } from "next/router";
+// src/pages/index.tsx
 import Layout from "../components/Layout";
-import WalletWizard from "../components/WalletWizard";
+import Link from "next/link";
 
-export default function Home() {
-    const [showWizard, setShowWizard] = useState(false);
-    const router = useRouter();
-
-    // Open wizard if ?wizard=true
-    useEffect(() => {
-        if (router.query.wizard === "true") {
-            setShowWizard(true);
-        }
-    }, [router.query]);
-
+export default function Landing() {
     return (
         <Layout>
-            <section className="min-h-screen flex flex-col items-center justify-center text-center px-6 bg-gradient-to-br from-gray-900 via-black to-gray-800 text-white">
-                <h1 className="text-5xl font-extrabold mb-6 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-                    Meet Merlin Wallet
-                </h1>
-                <p className="max-w-2xl text-lg text-gray-300 mb-8">
-                    Automagically powered by AI and blockchain — create wallets
-                    that follow your rules, so your money manages itself.
+            <section className="flex flex-col items-center justify-center text-center py-20">
+                <h1 className="text-5xl font-bold mb-6">Merlin Wallet</h1>
+                <p className="text-xl mb-10 max-w-xl">
+                    A simple, secure wallet for testing and building the future
+                    of Federated Value.
                 </p>
-                <button
-                    onClick={() => setShowWizard(true)}
-                    className="uv-btn uv-btn-primary uv-glow-strong"
+                <Link
+                    href="/wallets"
+                    className="px-6 py-3 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700"
                 >
-                    ✨ Create Wallet
-                </button>
+                    Enter Wallet
+                </Link>
             </section>
-
-            {showWizard && (
-                <WalletWizard onClose={() => setShowWizard(false)} />
-            )}
         </Layout>
     );
 }

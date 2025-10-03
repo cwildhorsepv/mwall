@@ -8,25 +8,23 @@ export default function WalletWizard({ onClose }: { onClose: () => void }) {
     const [managed, setManaged] = useState<boolean | null>(null);
     const router = useRouter();
 
-    function finish() {
-        // Simulate wallet creation
-        const newWallet = {
-            id: Date.now().toString(),
-            name: walletName || "Unnamed Wallet",
-            managed,
-            balance: "0.00 USDT",
-        };
+    async function finish() {
+        try {
+            const res = await fetch("/api/wallets", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: walletName || "Unnamed Wallet" }),
+            });
 
-        // Save to localStorage for now (later → NeonDB or API)
-        const existing = JSON.parse(localStorage.getItem("wallets") || "[]");
-        localStorage.setItem(
-            "wallets",
-            JSON.stringify([...existing, newWallet]),
-        );
+            if (!res.ok) throw new Error("Failed to create wallet");
 
-        // Close wizard + go to wallet list
-        onClose();
-        router.push("/wallets");
+            // Close wizard + go straight to /wallets
+            onClose();
+            router.push("/wallets");
+        } catch (err) {
+            console.error(err);
+            alert("Error creating wallet. Please try again.");
+        }
     }
 
     return (

@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("NETLIFY_DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  auth0Id   String   @unique // sub from Auth0
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  wallets  Wallet[]
+  sessions Session[]
+  Delegate Delegate[]
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime
+  accessToken  String? // Auth0 access token
+  idToken      String? // ID token (profile info)
+  refreshToken String? // optional, if you want refresh
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Wallet {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  balance   Float    @default(0)
+  createdAt DateTime @default(now())
+
+  user         User          @relation(fields: [userId], references: [id])
+  transactions Transaction[]
+  delegates    Delegate[] // 👈 new
+}
+
+model Delegate {
+  id        String   @id @default(uuid())
+  walletId  String
+  userId    String // who is delegated
+  createdAt DateTime @default(now())
+
+  wallet      Wallet       @relation(fields: [walletId], references: [id])
+  user        User         @relation(fields: [userId], references: [id])
+  permissions Permission[]
+
+  @@unique([walletId, userId], name: "walletId_userId")
+}
+
+model Permission {
+  id         String    @id @default(uuid())
+  delegateId String
+  action     String // e.g. VIEW_TRANSACTIONS, CATEGORIZE, RECONCILE, EXPORT_REPORTS
+  limit      Float? // optional (for spend caps etc.)
+  expiresAt  DateTime?
+
+  delegate Delegate @relation(fields: [delegateId], references: [id])
+}
+
+model Transaction {
+  id       String   @id @default(uuid())
+  walletId String
+  amount   Float
+  type     String // "credit" or "debit"
+  date     DateTime @default(now())
+
+  wallet Wallet @relation(fields: [walletId], references: [id])
+}

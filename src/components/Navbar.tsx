@@ -1,41 +1,59 @@
+// src/components/Navbar.tsx
 import Link from "next/link";
 import { useTheme } from "../context/ThemeContext";
-import { useRouter } from "next/router";
+import useSWR from "swr";
+
+const fetcher = (url: string) =>
+    fetch(url).then((res) => {
+        if (!res.ok) throw new Error("Unauthorized");
+        return res.json();
+    });
 
 export default function Navbar() {
     const { theme, toggleTheme } = useTheme();
-    const router = useRouter();
-
-    function handleCreate() {
-        // Redirect to homepage and trigger wizard via query param
-        router.push("/?wizard=true");
-    }
+    const { data: user, error, isLoading } = useSWR("/api/me", fetcher);
 
     return (
-        <nav className="bg-white/80 dark:bg-black/40 backdrop-blur p-4 flex justify-between items-center border-b border-gray-200 dark:border-white/10">
-            {/* Left side links */}
-            <div className="flex gap-6 font-semibold items-center">
-                <Link href="/wallets">Wallets</Link>
-                <Link href="/delegate">Delegate</Link>
-                <Link href="/checkout">Checkout</Link>
-
-                {/* Create Wallet button */}
-                <button
-                    onClick={handleCreate}
-                    className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 text-sm uv-glow-soft"
-                >
-                    + Create Wallet
-                </button>
+        <nav className="flex justify-between items-center p-4 bg-gray-100 dark:bg-gray-900">
+            <div className="flex gap-4 items-center">
+                {user && (
+                    <>
+                        <Link href="/wallets">Wallets</Link>
+                        <Link href="/delegate">Delegate</Link>
+                        <Link href="/checkout">Checkout</Link>
+                    </>
+                )}
             </div>
-
-            {/* Right side: theme toggle */}
             <div className="flex items-center gap-3">
                 <button
                     onClick={toggleTheme}
-                    className="px-3 py-1 rounded bg-gray-200 dark:bg-gray-700 dark:text-white text-sm"
+                    className="px-2 py-1 rounded bg-gray-300 dark:bg-gray-700"
                 >
-                    {theme === "dark" ? "☀ Light" : "🌙 Dark"}
+                    {theme === "dark" ? "☀️" : "🌙"}
                 </button>
+
+                {/* Show loading */}
+                {isLoading && <span className="text-gray-500">Loading...</span>}
+
+                {/* Show login if no user */}
+                {!user && !isLoading && (
+                    <Link
+                        href="/api/auth/login"
+                        className="px-3 py-1 bg-green-600 text-white rounded"
+                    >
+                        Login / Sign Up
+                    </Link>
+                )}
+
+                {/* Show logout if user */}
+                {user && !error && (
+                    <Link
+                        href="/api/auth/logout"
+                        className="px-3 py-1 bg-red-600 text-white rounded"
+                    >
+                        Logout
+                    </Link>
+                )}
             </div>
         </nav>
     );

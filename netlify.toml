@@ -1,7 +1,13 @@
 [build]
   command = "npm run build"
   publish = ".next"
-  environment = { NEXT_TELEMETRY_DISABLED = "1" }
+
+[build.environment]
+  NEXT_TELEMETRY_DISABLED = "1"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+# Enable Next.js cache
+[build.cache]
+  paths = [".next/cache", "node_modules/.cache"]

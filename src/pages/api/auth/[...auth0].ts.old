@@ -1,0 +1,28 @@
+// src/pages/api/auth/[...auth0].ts
+import { handleAuth, handleLogin } from "@auth0/nextjs-auth0";
+import { prisma } from "../../../server/prisma";
+
+export default handleAuth({
+    async login(req, res) {
+        // Redirect to /profile after successful login
+        return handleLogin(req, res, {
+            returnTo: "/profile",
+        });
+    },
+
+    async afterCallback(req, res, session) {
+        if (session?.user) {
+            const { sub, email, name } = session.user;
+            try {
+                await prisma.user.upsert({
+                    where: { id: sub },
+                    update: { email, name },
+                    create: { id: sub, email, name },
+                });
+            } catch (err) {
+                console.error("User upsert failed:", err);
+            }
+        }
+        return session;
+    },
+});

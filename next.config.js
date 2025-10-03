@@ -1,5 +1,7 @@
+// next.config.js
+/** @type {import('next').NextConfig} */
 const nextConfig = {
-    allowedDevOrigins: ["http://192.168.68.62:3000"],
+    experimental: {},
 };
 
 module.exports = nextConfig;
