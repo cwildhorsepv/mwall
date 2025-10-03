@@ -1,0 +1,79 @@
+🚀 Merlin Wallet POC – Progress Log
+✅ Auth0 Integration
+
+Fixed misconfigured AUTH0_ISSUER_BASE_URL (<tenant> placeholder → real tenant domain).
+
+Implemented full Auth0 login → code exchange → Neon session flow:
+
+/api/auth/login builds dynamic redirect using req.headers.host (works with localhost, 127.0.0.1, or LAN IP 192.168.68.62).
+
+/api/auth/callback exchanges code for tokens, decodes id_token, falls back to /userinfo if needed, and upserts user in Neon.
+
+Sessions persisted in Neon (Session table) + mwall_session cookie set.
+
+/api/auth/logout clears Neon session, nukes cookie, and redirects through Auth0’s /v2/logout.
+
+Verified login loop: Auth0 login → DB user + session created → /api/me returns user → logout clears session.
+
+✅ Neon + Prisma
+
+Detected and resolved drift (DB schema didn’t match Prisma).
+
+Nuked Neon, recreated schema with migrations.
+
+Verified tables exist: User, Session, Wallet, Transaction.
+
+Inserted seed wallets + transactions manually in Neon via SQL.
+
+Confirmed /wallets and /wallets/[id] fetch data correctly.
+
+✅ UI / Frontend
+
+Navbar cleaned up:
+
+Correct login/logout state via /api/me + SWR.
+
+No more infinite logout flash loop.
+
+/profile page wired to Neon session → shows DB-backed Auth0 user info.
+
+/wallets page lists user’s wallets from /api/wallets.
+
+/wallets/[id] page fixed: no more “Promise as child” error; now fetches JSON with SWR and renders balance + transactions.
+
+/checkout wired to deduct from wallet balance and record transaction.
+
+home.tsx (session-aware dev home) restored after Zed overwrite.
+
+index.tsx reset to simple landing page (hero + CTA).
+
+✅ API Routes
+
+/api/me → returns current user from Neon session.
+
+/api/wallets/index.ts → list + create wallets.
+
+/api/wallets/[id].ts → fetch wallet with transactions; supports adding transactions (credit/debit).
+
+/api/auth/* → login, callback, logout all working.
+
+All API routes enforce Neon session with getSession().
+
+✅ Delegation Architecture (Discussion + Schema Draft)
+
+Short-term: boolean isDelegated for quick toggle (demo).
+
+Medium-term: Delegate table (walletId, userId, createdAt).
+
+Added compound unique constraint:
+
+@@unique([walletId, userId], name: "walletId_userId")
+
+
+Long-term: Permission model for function-level delegation.
+
+Actions like VIEW_TRANSACTIONS, CATEGORIZE, RECONCILE, SPEND_FUNDS.
+
+Support for limits + expirations.
+
+Fits use cases like “invite accountant” (read + reconcile, no spend).

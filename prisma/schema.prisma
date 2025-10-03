@@ -4,75 +4,135 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("NETLIFY_DATABASE_URL")
+  url      = env("DATABASE_URL")
+}
+
+enum ViewportType {
+  OWNER
+  DERIVED
+  AGGREGATED
+}
+
+enum EndpointType {
+  ETH
+  BANK
+  MILES
+  CUSTOM
+}
+
+enum FedKind {
+  ETH_FED
+  USD_FED
+  MILES_FED
+  CUSTOM
+}
+
+enum PledgeStatus {
+  PENDING
+  ACTIVE
+  RELEASED
+  DEFAULTED
 }
 
 model User {
-  id        String   @id @default(uuid())
-  auth0Id   String   @unique // sub from Auth0
-  email     String   @unique
+  id        String     @id @default(cuid())
+  auth0Id   String?    @unique
+  email     String?    @unique
   name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  wallets  Wallet[]
-  sessions Session[]
-  Delegate Delegate[]
+  viewports Viewport[] @relation("user_viewports")
+  sessions  Session[]
+  createdAt DateTime   @default(now())
 }
 
 model Session {
-  id           String   @id @default(uuid())
+  id           String   @id @default(cuid())
   userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  // Keep tokens but prefer short-lived delegation tokens for viewport-scoped actions
+  accessToken  String?
+  idToken      String?
+  refreshToken String?
   createdAt    DateTime @default(now())
-  expiresAt    DateTime
-  accessToken  String? // Auth0 access token
-  idToken      String? // ID token (profile info)
-  refreshToken String? // optional, if you want refresh
-
-  user User @relation(fields: [userId], references: [id])
+  // optional: last_active, expires_at, etc.
 }
 
-model Wallet {
-  id        String   @id @default(uuid())
-  userId    String
-  name      String
-  balance   Float    @default(0)
-  createdAt DateTime @default(now())
-
-  user         User          @relation(fields: [userId], references: [id])
-  transactions Transaction[]
-  delegates    Delegate[] // 👈 new
+model Viewport {
+  id          String               @id @default(cuid())
+  ownerId     String
+  owner       User                 @relation("user_viewports", fields: [ownerId], references: [id])
+  name        String
+  type        ViewportType         @default(OWNER)
+  parentId    String? // if derived, link to parent viewport
+  parent      Viewport?            @relation("viewport_parent", fields: [parentId], references: [id])
+  children    Viewport[]           @relation("viewport_parent")
+  policyJson  Json? // human-friendly policy/limits/attributes
+  endpoints   EndpointOnViewport[]
+  delegations Delegation[]
+  createdAt   DateTime             @default(now())
 }
 
-model Delegate {
-  id        String   @id @default(uuid())
-  walletId  String
-  userId    String // who is delegated
-  createdAt DateTime @default(now())
-
-  wallet      Wallet       @relation(fields: [walletId], references: [id])
-  user        User         @relation(fields: [userId], references: [id])
-  permissions Permission[]
-
-  @@unique([walletId, userId], name: "walletId_userId")
+model Endpoint {
+  id        String       @id @default(cuid())
+  type      EndpointType
+  name      String?
+  config    Json // address, account, program ID, etc.
+  feds      Fed[]
+  createdAt DateTime     @default(now())
 }
 
-model Permission {
-  id         String    @id @default(uuid())
-  delegateId String
-  action     String // e.g. VIEW_TRANSACTIONS, CATEGORIZE, RECONCILE, EXPORT_REPORTS
-  limit      Float? // optional (for spend caps etc.)
-  expiresAt  DateTime?
+model EndpointOnViewport {
+  viewportId String
+  endpointId String
+  viewport   Viewport @relation(fields: [viewportId], references: [id])
+  endpoint   Endpoint @relation(fields: [endpointId], references: [id])
+  // optional: per-viewport endpoint settings (alias, visibility)
+  settings   Json?
 
-  delegate Delegate @relation(fields: [delegateId], references: [id])
+  @@id([viewportId, endpointId])
 }
 
-model Transaction {
-  id       String   @id @default(uuid())
-  walletId String
-  amount   Float
-  type     String // "credit" or "debit"
-  date     DateTime @default(now())
+model Fed {
+  id         String   @id @default(cuid())
+  endpointId String
+  endpoint   Endpoint @relation(fields: [endpointId], references: [id])
+  kind       FedKind
+  // canonical amount in base units (e.g., wei, cents, miles units)
+  amount     Decimal  @default(0)
+  metadata   Json?
+  // pledged: represents if this fed (or its portion) is currently locked by a pledge
+  createdAt  DateTime @default(now())
+  // notes: we treat ledgers as aggregates; advanced use may replace this with entries table
+}
 
-  wallet Wallet @relation(fields: [walletId], references: [id])
+model Pledge {
+  id         String       @id @default(cuid())
+  fedId      String
+  fed        Fed          @relation(fields: [fedId], references: [id])
+  viewportId String
+  viewport   Viewport     @relation(fields: [viewportId], references: [id])
+  amount     Decimal
+  terms      Json
+  status     PledgeStatus @default(PENDING)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+model Delegation {
+  id          String    @id @default(cuid())
+  viewportId  String
+  viewport    Viewport  @relation(fields: [viewportId], references: [id])
+  actorUserId String // user who is delegated to
+  scopes      String[] // e.g., ["TX_READ","SPEND:USD:50"]
+  limits      Json?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+model PolicyHook {
+  id         String   @id @default(cuid())
+  name       String
+  version    String
+  attachedTo String? // viewportId or orgId (nullable for global)
+  config     Json?
+  createdAt  DateTime @default(now())
 }
